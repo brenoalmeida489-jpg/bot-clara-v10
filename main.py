@@ -107,11 +107,16 @@ async def handle_new_message(event):
     
     user_text = event.raw_text or ""
     chat_id = event.chat_id
+    logging.info(f"Mensagem recebida de {chat_id}: {user_text}")
     save_interaction(chat_id, 'user', user_text)
     
     status = get_lead_status(chat_id)
     
-    if user_text and GATILHO_FRASE.lower() in user_text.lower():
+    # Gatilho flexível: remove espaços e pontos para comparar
+    def limpar(texto):
+        return re.sub(r'[^\w\s]', '', texto).lower().strip()
+
+    if user_text and limpar(GATILHO_FRASE) in limpar(user_text):
         logging.info(f"Gatilho ativado por {chat_id}")
         await disparar_fluxo(event, chat_id)
         return
