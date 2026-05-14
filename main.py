@@ -105,13 +105,13 @@ async def handle_new_message(event):
     if not event.is_private:
         return
     
-    user_text = event.raw_text
+    user_text = event.raw_text or ""
     chat_id = event.chat_id
     save_interaction(chat_id, 'user', user_text)
     
     status = get_lead_status(chat_id)
     
-    if GATILHO_FRASE.lower() in user_text.lower():
+    if user_text and GATILHO_FRASE.lower() in user_text.lower():
         logging.info(f"Gatilho ativado por {chat_id}")
         await disparar_fluxo(event, chat_id)
         return
