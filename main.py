@@ -32,6 +32,11 @@ client = TelegramClient('sessao_clara', API_ID, API_HASH,
                         retry_delay=5, 
                         auto_reconnect=True)
 
+def limpar(texto):
+    if texto is None:
+        return ""
+    return re.sub(r'[^\w\s]', '', str(texto)).lower().strip()
+
 def get_random_prints(count=3):
     prints_dir = 'prints'
     if not os.path.exists(prints_dir):
@@ -112,11 +117,10 @@ async def handle_new_message(event):
     
     status = get_lead_status(chat_id)
     
-    # Gatilho flexível: remove espaços e pontos para comparar
-    def limpar(texto):
-        return re.sub(r'[^\w\s]', '', texto).lower().strip()
+    # Garante que GATILHO_FRASE não seja None
+    gatilho = GATILHO_FRASE if GATILHO_FRASE else "Olá"
 
-    if user_text and limpar(GATILHO_FRASE) in limpar(user_text):
+    if user_text and limpar(gatilho) in limpar(user_text):
         logging.info(f"Gatilho ativado por {chat_id}")
         await disparar_fluxo(event, chat_id)
         return
