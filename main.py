@@ -211,7 +211,11 @@ async def main():
             print("="*30)
             await client.run_until_disconnected()
         except Exception as e:
-            logging.error(f"Erro na conexão do cliente: {e}. Tentando reconectar em 10 segundos...")
+            logging.error(f"Erro na conexão do cliente: {e}")
+            if "Could not find a matching Constructor" in str(e):
+                logging.info("Erro de construtor detectado (mudança no Telegram), reiniciando em 5 segundos...")
+            else:
+                logging.info("Tentando reconectar em 10 segundos...")
             await asyncio.sleep(10)
 
 if __name__ == '__main__':
