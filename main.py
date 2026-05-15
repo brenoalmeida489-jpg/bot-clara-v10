@@ -54,48 +54,48 @@ async def disparar_fluxo(event, chat_id):
 
         # 1. Boas-vindas
         async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.randint(2, 4))
+            await asyncio.sleep(random.randint(4, 7)) # Aumentado
             await client.send_message(entity, MSG_BOAS_VINDAS)
             save_interaction(chat_id, 'model', MSG_BOAS_VINDAS)
         
         # 2. Instagram
         async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.randint(3, 5))
+            await asyncio.sleep(random.randint(5, 8)) # Aumentado
             await client.send_message(entity, MSG_INSTAGRAM.format(link_instagram=LINK_INSTAGRAM))
             save_interaction(chat_id, 'model', MSG_INSTAGRAM.format(link_instagram=LINK_INSTAGRAM))
             
         # 3. Preparação para resultados
         async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.randint(3, 5))
+            await asyncio.sleep(random.randint(5, 9)) # Aumentado
             await client.send_message(entity, MSG_RESULTADOS)
             save_interaction(chat_id, 'model', MSG_RESULTADOS)
             
         # 4. Envio de Prints
         for img in get_random_prints(random.randint(3, 5)):
             async with client.action(entity, 'photo'):
-                await asyncio.sleep(random.randint(2, 4))
+                await asyncio.sleep(random.randint(4, 8)) # Aumentado para simular envio de arquivo
                 await client.send_file(entity, img)
                 save_interaction(chat_id, 'model', f"[Enviou Print: {img}]")
                 
         # 5. Apresentação dos Planos
         async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.randint(4, 6))
+            await asyncio.sleep(random.randint(6, 10)) # Aumentado
             await client.send_message(entity, MSG_APRESENTA_PLANOS)
             save_interaction(chat_id, 'model', MSG_APRESENTA_PLANOS)
             
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(3, 5))
         await client.send_message(entity, TEXTO_VITALICIO)
         save_interaction(chat_id, 'model', TEXTO_VITALICIO)
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(2, 4))
         await client.send_message(entity, TEXTO_SEMESTRAL)
         save_interaction(chat_id, 'model', TEXTO_SEMESTRAL)
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(2, 4))
         await client.send_message(entity, TEXTO_MENSAL)
         save_interaction(chat_id, 'model', TEXTO_MENSAL)
         
         # 6. Pergunta Final
         async with client.action(entity, 'typing'):
-            await asyncio.sleep(random.randint(3, 5))
+            await asyncio.sleep(random.randint(5, 8)) # Aumentado
             await client.send_message(entity, MSG_PERGUNTA_PLANO)
             save_interaction(chat_id, 'model', MSG_PERGUNTA_PLANO)
             
@@ -139,23 +139,36 @@ async def handle_new_message(event):
         new_status = status
 
         if "[COMPRAR_MENSAL]" in ai_raw_response:
-            if 'clicou_pagamento' in status and status != 'clicou_pagamento_mensal':
+            if status == 'clicou_pagamento_mensal':
+                # Se já enviou o link do mensal, não envia de novo, apenas confirma
+                messages_to_send.append("Isso aí, craque! O link do plano Mensal tá logo acima. Já conseguiu acessar?")
+            elif 'clicou_pagamento' in status:
                 messages_to_send.append(MSG_MUDANCA_PLANO.format(plano="Mensal", link=LINK_PAGAMENTO_MENSAL))
+                new_status = 'clicou_pagamento_mensal'
             else:
                 messages_to_send.append(MSG_FECHAMENTO_MENSAL.format(link=LINK_PAGAMENTO_MENSAL))
-            new_status = 'clicou_pagamento_mensal'
+                new_status = 'clicou_pagamento_mensal'
         elif "[COMPRAR_SEMESTRAL]" in ai_raw_response:
-            if 'clicou_pagamento' in status and status != 'clicou_pagamento_semestral':
+            if status == 'clicou_pagamento_semestral':
+                messages_to_send.append("Opa! O link do Semestral tá na mão logo acima. Bora pro time?")
+            elif 'clicou_pagamento' in status:
                 messages_to_send.append(MSG_MUDANCA_PLANO.format(plano="Semestral", link=LINK_PAGAMENTO_SEMESTRAL))
+                new_status = 'clicou_pagamento_semestral'
             else:
                 messages_to_send.append(MSG_FECHAMENTO_SEMESTRAL.format(link=LINK_PAGAMENTO_SEMESTRAL))
-            new_status = 'clicou_pagamento_semestral'
+                new_status = 'clicou_pagamento_semestral'
         elif "[COMPRAR_VITALICIO]" in ai_raw_response:
-            if 'clicou_pagamento' in status and status != 'clicou_pagamento_vitalicio':
+            if status == 'clicou_pagamento_vitalicio':
+                messages_to_send.append("Aí sim! O link do Vitalício tá logo ali em cima. Alguma dúvida pra finalizar?")
+            elif 'clicou_pagamento' in status:
                 messages_to_send.append(MSG_MUDANCA_PLANO.format(plano="Vitalício", link=LINK_PAGAMENTO_VITALICIO))
+                new_status = 'clicou_pagamento_vitalicio'
             else:
                 messages_to_send.append(MSG_FECHAMENTO_VITALICIO.format(link=LINK_PAGAMENTO_VITALICIO))
-            new_status = 'clicou_pagamento_vitalicio'
+                new_status = 'clicou_pagamento_vitalicio'
+        elif "[JA_COMPROU]" in ai_raw_response:
+            messages_to_send.append("Top demais, craque! Se você já garantiu sua vaga, seja muito bem-vindo ao time. 🚀\n\nAgora é só aguardar um minutinho que o sistema já vai liberar seu acesso. Bora forrar!")
+            new_status = 'aluno_confirmado'
         else:
             if "[QUEBRA]" in ai_raw_response:
                 messages_to_send = [m.strip() for m in ai_raw_response.split("[QUEBRA]") if m.strip()]
@@ -171,11 +184,13 @@ async def handle_new_message(event):
             entity = await client.get_entity(chat_id)
             for msg in messages_to_send:
                 async with client.action(entity, 'typing'):
-                    wait_time = min(len(msg) * 0.06, 4) + random.uniform(0.5, 1.5)
+                    # Tempo de digitação mais realista: ~0.1s por caractere, com limites mais humanos
+                    wait_time = min(len(msg) * 0.12, 8) + random.uniform(1.5, 3.0)
                     await asyncio.sleep(wait_time)
                     await client.send_message(entity, msg)
                     save_interaction(chat_id, 'model', msg)
-                    await asyncio.sleep(random.uniform(1.0, 2.5))
+                    # Pausa entre mensagens consecutivas mais longa
+                    await asyncio.sleep(random.uniform(2.5, 4.5))
         except Exception as e:
             logging.error(f"Erro ao enviar resposta da IA para {chat_id}: {e}")
     else:
