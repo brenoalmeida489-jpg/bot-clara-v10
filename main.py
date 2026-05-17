@@ -159,6 +159,5 @@ if __name__ == '__main__':
     # Inicia servidor web para o Render não derrubar o serviço
     keep_alive()
     
-    # Rodar o bot
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_bot())
+    # Rodar o bot de forma segura
+    asyncio.run(start_bot())
