@@ -16,25 +16,34 @@ from web_server import keep_alive
 
 # Configuração de Logging
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
-API_ID = int(os.getenv('API_ID', '0'))
-API_HASH = os.getenv('API_HASH', '')
-STRING_SESSION = os.getenv('STRING_SESSION', '')
+API_ID = os.getenv('API_ID')
+API_HASH = os.getenv('API_HASH')
+STRING_SESSION = os.getenv('STRING_SESSION')
 GATILHO_FRASE = os.getenv('GATILHO_FRASE', 'quero saber mais')
 LINK_INSTAGRAM = os.getenv('LINK_INSTAGRAM', '')
 
-# Configuração do Cliente com StringSession para evitar erros de IP no Render
+if not API_ID or not API_HASH:
+    logger.error("ERRO: API_ID ou API_HASH não configurados nas variáveis de ambiente!")
+    exit(1)
+
+API_ID = int(API_ID)
+
+# Configuração do Cliente
 if STRING_SESSION:
+    logger.info("Usando STRING_SESSION para conexão...")
     client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH, 
-                            connection_retries=None, 
+                            connection_retries=5, 
                             retry_delay=5, 
                             auto_reconnect=True)
 else:
+    logger.info("Usando sessão local (sessao_clara)...")
     client = TelegramClient('sessao_clara', API_ID, API_HASH, 
-                            connection_retries=None, 
+                            connection_retries=5, 
                             retry_delay=5, 
                             auto_reconnect=True)
 
@@ -57,12 +66,8 @@ def get_random_prints(count=3):
 
 async def disparar_fluxo(event, chat_id):
     try:
-        try:
-            entity = await client.get_entity(chat_id)
-        except Exception as e:
-            logging.warning(f"Não foi possível obter entidade para {chat_id}, tentando via event: {e}")
-            entity = await event.get_chat()
-
+        entity = await event.get_chat()
+        
         # 1. Boas-vindas
         async with client.action(entity, 'typing'):
             await asyncio.sleep(random.randint(2, 4))
@@ -90,7 +95,7 @@ async def disparar_fluxo(event, chat_id):
                     await client.send_file(entity, img)
                     save_interaction(chat_id, 'model', f"[Enviou Print: {img}]")
             except Exception as e:
-                logging.error(f"Erro ao enviar print {img}: {e}")
+                logger.error(f"Erro ao enviar print {img}: {e}")
                 
         # 5. Apresentação dos Planos
         async with client.action(entity, 'typing'):
@@ -115,10 +120,10 @@ async def disparar_fluxo(event, chat_id):
             save_interaction(chat_id, 'model', MSG_PERGUNTA_PLANO)
             
         update_lead_status(chat_id, 'vi_planos')
-        logging.info(f"Fluxo concluído para o usuário {chat_id}")
+        logger.info(f"Fluxo concluído para o usuário {chat_id}")
         
     except Exception as e:
-        logging.error(f"Erro ao disparar fluxo para {chat_id}: {e}")
+        logger.error(f"Erro ao disparar fluxo para {chat_id}: {e}")
 
 @client.on(events.NewMessage(incoming=True))
 async def handle_new_message(event):
@@ -127,14 +132,14 @@ async def handle_new_message(event):
     
     user_text = event.raw_text or ""
     chat_id = event.chat_id
-    logging.info(f"Mensagem recebida de {chat_id}: {user_text}")
+    logger.info(f"Mensagem recebida de {chat_id}: {user_text}")
     save_interaction(chat_id, 'user', user_text)
     
     status = get_lead_status(chat_id)
     gatilho = GATILHO_FRASE if GATILHO_FRASE else "quero saber mais"
 
     if user_text and limpar(gatilho) in limpar(user_text):
-        logging.info(f"Gatilho ativado por {chat_id}")
+        logger.info(f"Gatilho ativado por {chat_id}")
         await disparar_fluxo(event, chat_id)
     elif status == 'vi_planos':
         history = get_chat_history(chat_id)
@@ -145,19 +150,29 @@ async def handle_new_message(event):
             save_interaction(chat_id, 'model', response)
 
 async def start_bot():
-    # Inicializa o banco de dados
     try:
         init_db()
     except Exception as e:
-        logging.error(f"Erro ao inicializar banco de dados: {e}")
+        logger.error(f"Erro ao inicializar banco de dados: {e}")
         
-    await client.start()
-    logging.info("Userbot Clara iniciado e aguardando mensagens...")
+    logger.info("Conectando ao Telegram...")
+    await client.connect()
+    
+    if not await client.is_user_authorized():
+        logger.error("ERRO: Sessão não autorizada! Verifique a STRING_SESSION.")
+        return
+        
+    logger.info("Userbot Clara ONLINE e aguardando mensagens!")
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Inicia servidor web para o Render não derrubar o serviço
+    # Inicia servidor web para o Render
     keep_alive()
     
-    # Rodar o bot de forma segura
-    asyncio.run(start_bot())
+    # Rodar o bot
+    try:
+        asyncio.run(start_bot())
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        logger.critical(f"Erro fatal: {e}")
