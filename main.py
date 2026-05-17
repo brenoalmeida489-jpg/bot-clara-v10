@@ -145,6 +145,7 @@ async def handle_new_message(event):
             save_interaction(chat_id, 'model', response)
 
 async def start_bot():
+    # Inicializa o banco de dados
     try:
         init_db()
     except Exception as e:
@@ -155,6 +156,9 @@ async def start_bot():
     await client.run_until_disconnected()
 
 if __name__ == '__main__':
+    # Inicia servidor web para o Render não derrubar o serviço
     keep_alive()
+    
+    # Rodar o bot
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_bot())
